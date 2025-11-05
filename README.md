@@ -1,5 +1,6 @@
-# Predicting sedimentation velocity using ML  
-ML project to predict sedimentation velocity. Contains some MLOps best practices.
+# Computer vision to detect steel defetcs
+Using computer vision (CV) to detect steel defects. Use case fit for automotive/manufacturing. Built for Cloudera.
+
 ## Project structure
 ```markdown
 project-root/
@@ -14,8 +15,8 @@ project-root/
 │   ├── model_training_job.py         # loads, preprocesses and trains/eval model
 │   ├── model_deployment_job.py       # registers and deploys new model if perf criterion is fulfilled
 ├── notebooks/
-│   ├── EDA_ml_sediment.ipynb     # exploratory data analysis with visuals
-│   ├── modular_ml_sediment.ipynb # modular code
+│   ├── EDA_cv_steel.ipynb     # exploratory data analysis with visuals
+│   ├── modular_cv_steel.ipynb # modular code
 ├── src/
 │   ├── data_utils.py     # data loading & cleaning
 │   ├── preprocessing.py  # preproc pipelines
