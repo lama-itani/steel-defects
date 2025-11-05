@@ -6,7 +6,7 @@ Using computer vision (CV) to detect steel defects. Use case fit for automotive/
 project-root/
 ├── train_job.py    # job script checks for new data, retrains and deploys based on criterion
 ├── data/
-│   ├── raw/        # contains raw images, divided into training and validation along with their     │   |               annotation. This folder is included in the .gitignore
+│   ├── raw/        # contains raw images, divided into training and validation
 │   ├── interim/    # contains .csv with no duplicates and NaNs replaced by mean value
 │   └── processed/
 ├── mlruns/         # for model logging (hidden and for local use only)
