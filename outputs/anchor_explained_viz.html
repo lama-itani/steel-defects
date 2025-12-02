@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RetinaNet Anchor Visualization</title>
+    <title>Object Detection: Anchor Boxes Explained</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -94,12 +94,11 @@
     </style>
 </head>
 <body>
-    <h1>How Anchor Box for Defect Detection Works</h1>
+    <h1>How Object Detection Works: Anchor Boxes Explained</h1>
     
     <div class="container">
         <div class="info">
-            <strong>How it works:</strong> Click anywhere on the image to see 9 anchor boxes at that location. 
-            These are the "template boxes" RetinaNet uses to detect defects. The model adjusts the closest matching anchor to fit the actual defect.
+            <strong>The Concept:</strong> Instead of randomly searching, object detection models use anchor boxes, which are pre-defined templates that act as starting guesses. Click anywhere to see 9 template boxes at that location: 3 sizes × 3 shapes = 9 anchors scanning simultaneously.
         </div>
         
         <div class="legend">
@@ -117,7 +116,7 @@
             </div>
             <div class="legend-item">
                 <div class="color-box" style="background: rgba(255, 215, 0, 0.3);"></div>
-                <span>Ground Truth Defect</span>
+                <span>Ground Truth Object</span>
             </div>
         </div>
         
@@ -126,7 +125,7 @@
         <div class="controls">
             <button onclick="showGrid()">Show Grid (Spatial Locations)</button>
             <button onclick="toggleAllAnchors()">Toggle All Anchors</button>
-            <button onclick="showDefectExample()">Show Defect Example</button>
+            <button onclick="showDefectExample()">Show Detection Example</button>
             <button onclick="clearCanvas()">Clear</button>
         </div>
         
@@ -136,7 +135,7 @@
                 <div class="stat-value" id="anchorsPerLocation">9</div>
             </div>
             <div class="stat-box">
-                <div class="stat-label">Grid Size (50×50)</div>
+                <div class="stat-label">Grid Size (50x50)</div>
                 <div class="stat-value" id="totalLocations">2,500</div>
             </div>
             <div class="stat-box">
@@ -144,20 +143,21 @@
                 <div class="stat-value" id="totalAnchors">22,500</div>
             </div>
             <div class="stat-box">
-                <div class="stat-label">Classes (6 defects + bg)</div>
-                <div class="stat-value" id="numClasses">7</div>
+                <div class="stat-label">Object Classes</div>
+                <div class="stat-value" id="numClasses">Variable</div>
             </div>
         </div>
     </div>
     
     <div class="container">
-        <h3>Understanding the Numbers</h3>
+        <h3>The Detection Process</h3>
         <div class="info">
-            <p><strong>3 Scales:</strong> Different sizes to detect small scratches vs large patches</p>
-            <p><strong>3 Aspect Ratios:</strong> Wide (0.5), Square (1.0), Tall (2.0) to match defect shapes</p>
-            <p><strong>3 × 3 = 9 anchors</strong> at each grid location</p>
-            <p><strong>Output per location:</strong> 9 anchors × 7 classes = 63 predictions</p>
-            <p><strong>Why rebuild head?</strong> Original model: 9 × 80 = 720 outputs. Our model: 9 × 7 = 63 outputs</p>
+            <p><strong>1. Place Templates:</strong> 9 anchor boxes at every grid location (3 sizes × 3 shapes)</p>
+            <p><strong>2. Pick & Adjust:</strong> Model selects anchors overlapping objects and refines them to fit exactly</p>
+            <p><strong>3. Classify:</strong> Assigns object type and confidence score to each adjusted anchor</p>
+            <br>
+            <p><strong>Why 9 anchors?</strong> Different sizes detect small to large objects. Different shapes (wide, square, tall) match object proportions.</p>
+            <p><strong>Scale:</strong> For a 50×50 grid = 2,500 locations × 9 anchors = 22,500 templates scanning simultaneously.</p>
         </div>
     </div>
 
@@ -243,7 +243,7 @@
                 // Label grid
                 ctx.fillStyle = 'black';
                 ctx.font = '12px Arial';
-                ctx.fillText('50×50 Grid = 2,500 locations', 10, 20);
+                ctx.fillText('50x50 Grid = 2,500 locations', 10, 20);
                 ctx.fillText('Each location has 9 anchors', 10, 35);
                 ctx.fillText('Total: 22,500 anchor boxes', 10, 50);
             }
@@ -271,11 +271,11 @@
             }
         }
         
-        // Show example with defect
+        // Show example with object
         function showDefectExample() {
             clearCanvas();
             
-            // Draw a scratch defect
+            // Draw an elongated object
             const defectX = 400;
             const defectY = 300;
             const defectW = 180;
@@ -292,7 +292,7 @@
             
             ctx.fillStyle = 'black';
             ctx.font = 'bold 14px Arial';
-            ctx.fillText('Ground Truth: Scratch Defect', defectX - 90, defectY - defectH/2 - 10);
+            ctx.fillText('Ground Truth Object', defectX - 70, defectY - defectH/2 - 10);
             
             // Draw anchors at this location
             drawAnchors(defectX, defectY);
@@ -312,11 +312,11 @@
             ctx.fillRect(10, canvas.height - 80, 380, 70);
             ctx.fillStyle = 'lime';
             ctx.font = 'bold 14px Arial';
-            ctx.fillText('✓ Best matching anchor (highlighted in green)', 20, canvas.height - 55);
+            ctx.fillText('âœ“ Best matching anchor (highlighted in green)', 20, canvas.height - 55);
             ctx.fillStyle = 'white';
             ctx.font = '12px Arial';
-            ctx.fillText('Model adjusts this anchor to fit the defect exactly', 20, canvas.height - 35);
-            ctx.fillText('Then classifies it as "scratch" with confidence score', 20, canvas.height - 15);
+            ctx.fillText('Model adjusts this anchor to fit the object exactly', 20, canvas.height - 35);
+            ctx.fillText('Then classifies object type with confidence score', 20, canvas.height - 15);
         }
         
         // Clear canvas
