@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RetinaNet Anchor Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        canvas {
+            border: 2px solid #333;
+            display: block;
+            margin: 20px auto;
+            cursor: crosshair;
+            background: #e0e0e0;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .color-box {
+            width: 30px;
+            height: 20px;
+            border: 2px solid #333;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-box {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>How Anchor Box for Defect Detection Works</h1>
+    
+    <div class="container">
+        <div class="info">
+            <strong>How it works:</strong> Click anywhere on the image to see 9 anchor boxes at that location. 
+            These are the "template boxes" RetinaNet uses to detect defects. The model adjusts the closest matching anchor to fit the actual defect.
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box" style="background: rgba(255, 0, 0, 0.2);"></div>
+                <span>Small Anchors (32×32 base)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: rgba(0, 255, 0, 0.2);"></div>
+                <span>Medium Anchors (64×64 base)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: rgba(0, 0, 255, 0.2);"></div>
+                <span>Large Anchors (128×128 base)</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box" style="background: rgba(255, 215, 0, 0.3);"></div>
+                <span>Ground Truth Defect</span>
+            </div>
+        </div>
+        
+        <canvas id="anchorCanvas" width="800" height="600"></canvas>
+        
+        <div class="controls">
+            <button onclick="showGrid()">Show Grid (Spatial Locations)</button>
+            <button onclick="toggleAllAnchors()">Toggle All Anchors</button>
+            <button onclick="showDefectExample()">Show Defect Example</button>
+            <button onclick="clearCanvas()">Clear</button>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-label">Anchors per Location</div>
+                <div class="stat-value" id="anchorsPerLocation">9</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Grid Size (50×50)</div>
+                <div class="stat-value" id="totalLocations">2,500</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Total Anchors</div>
+                <div class="stat-value" id="totalAnchors">22,500</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Classes (6 defects + bg)</div>
+                <div class="stat-value" id="numClasses">7</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h3>Understanding the Numbers</h3>
+        <div class="info">
+            <p><strong>3 Scales:</strong> Different sizes to detect small scratches vs large patches</p>
+            <p><strong>3 Aspect Ratios:</strong> Wide (0.5), Square (1.0), Tall (2.0) to match defect shapes</p>
+            <p><strong>3 × 3 = 9 anchors</strong> at each grid location</p>
+            <p><strong>Output per location:</strong> 9 anchors × 7 classes = 63 predictions</p>
+            <p><strong>Why rebuild head?</strong> Original model: 9 × 80 = 720 outputs. Our model: 9 × 7 = 63 outputs</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('anchorCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Anchor configuration
+        const scales = [32, 64, 128];  // Small, Medium, Large
+        const aspectRatios = [0.5, 1.0, 2.0];  // Wide, Square, Tall
+        const colors = ['rgba(255, 0, 0, 0.3)', 'rgba(0, 255, 0, 0.3)', 'rgba(0, 0, 255, 0.3)'];
+        
+        let showingGrid = false;
+        let showingAllAnchors = false;
+        let defectBox = null;
+        
+        // Draw steel texture background
+        function drawBackground() {
+            ctx.fillStyle = '#b0b0b0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add some texture
+            for (let i = 0; i < 100; i++) {
+                ctx.fillStyle = `rgba(${Math.random() * 50}, ${Math.random() * 50}, ${Math.random() * 50}, 0.1)`;
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 
+                           Math.random() * 20, Math.random() * 20);
+            }
+        }
+        
+        // Draw anchor boxes at a location
+        function drawAnchors(x, y) {
+            let anchorIndex = 0;
+            scales.forEach((scale, scaleIdx) => {
+                aspectRatios.forEach(ratio => {
+                    const width = scale * Math.sqrt(ratio);
+                    const height = scale / Math.sqrt(ratio);
+                    
+                    ctx.strokeStyle = colors[scaleIdx];
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x - width/2, y - height/2, width, height);
+                    
+                    // Label anchor
+                    ctx.fillStyle = colors[scaleIdx].replace('0.3', '1.0');
+                    ctx.font = '10px Arial';
+                    ctx.fillText(`A${anchorIndex + 1}`, x - width/2 + 2, y - height/2 + 12);
+                    
+                    anchorIndex++;
+                });
+            });
+            
+            // Draw center point
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        // Draw grid showing spatial locations
+        function showGrid() {
+            clearCanvas();
+            showingGrid = !showingGrid;
+            
+            if (showingGrid) {
+                const gridSize = 50;
+                const cellWidth = canvas.width / gridSize;
+                const cellHeight = canvas.height / gridSize;
+                
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                
+                for (let i = 0; i <= gridSize; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * cellWidth, 0);
+                    ctx.lineTo(i * cellWidth, canvas.height);
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * cellHeight);
+                    ctx.lineTo(canvas.width, i * cellHeight);
+                    ctx.stroke();
+                }
+                
+                // Label grid
+                ctx.fillStyle = 'black';
+                ctx.font = '12px Arial';
+                ctx.fillText('50×50 Grid = 2,500 locations', 10, 20);
+                ctx.fillText('Each location has 9 anchors', 10, 35);
+                ctx.fillText('Total: 22,500 anchor boxes', 10, 50);
+            }
+        }
+        
+        // Toggle all anchors visualization
+        function toggleAllAnchors() {
+            showingAllAnchors = !showingAllAnchors;
+            clearCanvas();
+            
+            if (showingAllAnchors) {
+                const step = 80;
+                for (let x = step; x < canvas.width; x += step) {
+                    for (let y = step; y < canvas.height; y += step) {
+                        drawAnchors(x, y);
+                    }
+                }
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(10, 10, 350, 40);
+                ctx.fillStyle = 'white';
+                ctx.font = '14px Arial';
+                ctx.fillText('Showing anchors at every 10th grid location', 20, 30);
+                ctx.fillText('(Imagine this at all 2,500 locations!)', 20, 45);
+            }
+        }
+        
+        // Show example with defect
+        function showDefectExample() {
+            clearCanvas();
+            
+            // Draw a scratch defect
+            const defectX = 400;
+            const defectY = 300;
+            const defectW = 180;
+            const defectH = 45;
+            
+            defectBox = {x: defectX, y: defectY, w: defectW, h: defectH};
+            
+            // Draw ground truth
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+            ctx.fillRect(defectX - defectW/2, defectY - defectH/2, defectW, defectH);
+            ctx.strokeStyle = 'rgba(255, 215, 0, 1.0)';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(defectX - defectW/2, defectY - defectH/2, defectW, defectH);
+            
+            ctx.fillStyle = 'black';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText('Ground Truth: Scratch Defect', defectX - 90, defectY - defectH/2 - 10);
+            
+            // Draw anchors at this location
+            drawAnchors(defectX, defectY);
+            
+            // Highlight best matching anchor
+            const bestScale = 128;
+            const bestRatio = 0.5;
+            const bestWidth = bestScale * Math.sqrt(bestRatio);
+            const bestHeight = bestScale / Math.sqrt(bestRatio);
+            
+            ctx.strokeStyle = 'lime';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(defectX - bestWidth/2, defectY - bestHeight/2, bestWidth, bestHeight);
+            
+            // Add annotation
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(10, canvas.height - 80, 380, 70);
+            ctx.fillStyle = 'lime';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText('✓ Best matching anchor (highlighted in green)', 20, canvas.height - 55);
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.fillText('Model adjusts this anchor to fit the defect exactly', 20, canvas.height - 35);
+            ctx.fillText('Then classifies it as "scratch" with confidence score', 20, canvas.height - 15);
+        }
+        
+        // Clear canvas
+        function clearCanvas() {
+            drawBackground();
+            showingGrid = false;
+            showingAllAnchors = false;
+            defectBox = null;
+        }
+        
+        // Click handler
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            clearCanvas();
+            drawAnchors(x, y);
+            
+            // Add instruction
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, 10, 320, 25);
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.fillText('Showing 9 anchors at clicked location', 20, 27);
+        });
+        
+        // Initialize
+        drawBackground();
+        
+        // Show initial example
+        setTimeout(() => {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(canvas.width/2 - 150, canvas.height/2 - 30, 300, 60);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Click anywhere to see anchor boxes', canvas.width/2, canvas.height/2 - 5);
+            ctx.font = '14px Arial';
+            ctx.fillText('or use buttons below', canvas.width/2, canvas.height/2 + 20);
+            ctx.textAlign = 'left';
+        }, 100);
+    </script>
+</body>
+</html>
