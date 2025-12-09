@@ -115,7 +115,7 @@ print("=" * 60)
 print("\n[TEST 1] Dataset Loading")
 print("-" * 60)
 try:
-    dataset = SteelDefectDataset(config.TRAIN_IMG, config.TRAIN_ANN, transforms=get_transforms())
+    dataset = SteelDefectDataset(config.TRAIN_IMG, config.TRAIN_ANN, transforms = get_transforms())
     print(f"Dataset created successfully!")
     print(f"Total images: {len(dataset)}")
     
@@ -143,10 +143,10 @@ print("-" * 60)
 try:
     loader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=config.BATCH_SIZE,
-        shuffle=False,
-        num_workers=config.NUM_WORKERS,
-        collate_fn=collate_func
+        batch_size = config.BATCH_SIZE,
+        shuffle = False,
+        num_workers = config.NUM_WORKERS,
+        collate_fn = collate_func
     )
     print(f"DataLoader created successfully")
     
@@ -163,14 +163,14 @@ except Exception as e:
 print("\n[TEST 3] Model Creation")
 print("-" * 60)
 try:
-    model = retinanet_resnet50_fpn_v2(weights="DEFAULT")
+    model = retinanet_resnet50_fpn_v2(weights = "DEFAULT")
     print(f"Base model loaded")
     
     num_anchors = model.head.classification_head.num_anchors
     model.head.classification_head = RetinaNetClassificationHead(
-        in_channels=256,
-        num_anchors=num_anchors,
-        num_classes=config.NUM_CLASSES
+        in_channels = 256,
+        num_anchors = num_anchors,
+        num_classes = config.NUM_CLASSES
     )
     print(f"Classification head replaced")
     print(f"Num anchors: {num_anchors}")
@@ -179,7 +179,7 @@ try:
     model = model.to(device)
     print(f"Model moved to device: {device}")
 except Exception as e:
-    print(f"✗ Model creation failed: {e}")
+    print(f"Model creation failed: {e}")
     sys.exit(1)
 
 # TEST 4: Model inference
@@ -197,7 +197,7 @@ try:
         print(f"Pred scores shape: {predictions[0]['scores'].shape}")
         print(f"Pred labels range: {predictions[0]['labels'].min().item()}-{predictions[0]['labels'].max().item()}")
 except Exception as e:
-    print(f"✗ Model inference failed: {e}")
+    print(f"Model inference failed: {e}")
     sys.exit(1)
 
 # TEST 5: Training mode (loss computation)
@@ -222,14 +222,14 @@ try:
     total_loss.backward()
     print(f"Backward pass successful")
 except Exception as e:
-    print(f"✗ Training mode failed: {e}")
+    print(f"Training mode failed: {e}")
     sys.exit(1)
 
 # TEST 6: Optimizer step
 print("\n[TEST 6] Optimizer Step")
 print("-" * 60)
 try:
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = torch.optim.SGD(model.parameters(), lr = 0.001, momentum = 0.9)
     optimizer.zero_grad()
     
     # Fresh forward pass
@@ -248,7 +248,7 @@ except Exception as e:
 print("\n[TEST 7] Checkpoint Saving")
 print("-" * 60)
 try:
-    Path("models").mkdir(exist_ok=True)
+    Path("models").mkdir(exist_ok = True)
     torch.save(model.state_dict(), "models/test_checkpoint.pth")
     print(f"Checkpoint saved successfully")
     print(f"Location: models/test_checkpoint.pth")
