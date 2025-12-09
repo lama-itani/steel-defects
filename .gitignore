@@ -1,6 +1,23 @@
+# Python cache
 __pycache__/
 *.pyc
 .env
+
+# Virtual env
 venv/
+
+# VS code
 .vscode/settings.json
+
+# Data
 data/raw/
+
+# Model checkpoints
+models/*.pth
+*.pth
+
+# Outputs
+output/
+
+# Jupyter
+.ipynb_checkpoints/
