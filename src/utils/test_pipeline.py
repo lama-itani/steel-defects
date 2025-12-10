@@ -17,9 +17,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '../..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-
-if project_root not in sys.path: # add project root to sys.path
-    sys.path.insert(0, project_root)
 print(f"Project root added to sys.path: {project_root}")
 
 from pathlib import Path
@@ -100,7 +97,7 @@ class SteelDefectDataset(torch.utils.data.Dataset):
 
 def get_transforms():
     return A.Compose([
-        A.Normalize(mean = (0,0,0), std = (1,1,1)),
+        A.Normalize(mean = (.485, .456, .406), std = (.229, .224, .225)),
         ToTensorV2()
     ], bbox_params = A.BboxParams(format = "pascal_voc", label_fields = ["labels"]))
 
@@ -135,6 +132,29 @@ try:
         sys.exit(1)
 except Exception as e:
     print(f"Dataset loading failed: {e}")
+    sys.exit(1)
+
+# Test 1.5: Verify normalization
+print("\n[TEST 1.5] Verify Normalization")
+print("-" * 60)
+try:
+    image, target = dataset[1]
+    img_min, img_max = image.min().item(), image.max().item()
+    img_mean = image.mean().item()
+    
+    print(f"Image range: [{img_min:.3f}, {img_max:.3f}]")
+    print(f"Image mean: {img_mean:.3f}")
+    
+    # Used ImageNet normalization, expect roughly [-2, 2] range and mean near 0
+    if -3 < img_min < -0.5 and 0.5 < img_max < 3:
+        print("✓ ImageNet normalization detected")
+    elif 0 <= img_min < 0.1 and 0.9 < img_max <= 1.0:
+        print("WARNING: No normalization applied (values in [0,1])")
+    else:
+        print(f"Unexpected range, check normalization")
+        
+except Exception as e:
+    print(f"Normalization check failed: {e}")
     sys.exit(1)
 
 # TEST 2: DataLoader
