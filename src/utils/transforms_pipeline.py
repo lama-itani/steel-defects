@@ -8,12 +8,12 @@ def get_train_transforms():
         A.RandomRotate90(p = .5), # rotate 90, 180 or 270 degrees >> increase orientation variety
         A.RandomBrightnessContrast(p = .3), # adjust brightness/contrast >> image quality
         A.GaussNoise(p = .2), # add random noise
-        A.Normalize(mean = (0,0,0), std = (1,1,1)), # force normalization since ToTensorV2 isn't working
+        A.Normalize(mean = (.485, .456, .406), std = (.229, .224, .225)), # force normalization since ToTensorV2 isn't working
         ToTensorV2() # converts NumPy array to PyTorch tensor, divides pix by 255 ([0,1] range), permutes format from [H,W,C] to [C,H,W].
     ], bbox_params = A.BboxParams(format = "pascal_voc", label_fields = ["labels"])) # XML annotation has a Pascal Voc format
 
 def get_val_transforms(): # for validation on clean images, converting only to tensor format, no augmentation.
     return A.Compose([
-        A.Normalize(mean = (0,0,0), std = (1,1,1)),
+        A.Normalize(mean = (.485, .456, .406), std = (.229, .224, .225)),
         ToTensorV2()
     ], bbox_params = A.BboxParams(format = "pascal_voc", label_fields = ["labels"]))
