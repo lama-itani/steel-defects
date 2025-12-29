@@ -18,7 +18,7 @@ class SteelDefectDataset(torch.utils.data.Dataset): # inherits from PyTorch Data
             "pitted_surface" : 4,
             "rolled-in_scale" : 5,
             "scratches" : 6,
-        }                                                  # mapping defect names (categorical) to integers (numerical)
+        }  # mapping defect names (categorical) to integers (numerical)
     def __len__(self): # runs total number of images
         return len(self.images) 
     
