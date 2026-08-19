@@ -1,8 +1,33 @@
+# Virtual Environments
+.*venv*/
+*venv*/
+.visual-qc/
 venv-CVsteel/
+
+# ML Models & Weights
 *.pth
 *.pt
 *.ckpt
+
+# Python & Notebook Caches
 __pycache__/
 *.pyc
+*.egg-info/
 .ipynb_checkpoints/
+
+# OS Metadata
 .DS_Store
+
+# CDSW Container & System Noise
+.cache/s
+.config/
+.dotnet/
+.vscode-server/
+.copilot/
+.nfs*
+*.crl
+*.logs
+*.tmp
+.bash_history
+.wget-hsts
+.Rprofile
