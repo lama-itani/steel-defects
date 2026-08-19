@@ -19,7 +19,7 @@ __pycache__/
 .DS_Store
 
 # CDSW Container & System Noise
-.cache/s
+.cache/
 .config/
 .dotnet/
 .vscode-server/
