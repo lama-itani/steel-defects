@@ -47,6 +47,7 @@ pyparsing==3.2.5
 python-dateutil==2.9.0.post0
 PyYAML==6.0.3
 pyzmq==27.1.0
+scikit-learn>=1.5
 scipy==1.16.3
 setuptools==80.9.0
 simsimd==6.5.3
