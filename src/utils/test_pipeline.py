@@ -11,52 +11,28 @@ It tests sequentially:
 Exits on the first failure.
 """
 import sys
-import os
 import tempfile
 from pathlib import Path
 
-# Make `src.utils.*` importable when this file is executed directly.
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '../..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-print(f"Project root added to sys.path: {project_root}")
+# The actual paths/params come from src/utils/config.py
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import numpy as np
 import torch
 from torchvision.models.detection import retinanet_resnet50_fpn_v2
 from torchvision.models.detection.retinanet import RetinaNetClassificationHead
 
-# Import the real dataset/collate/transforms — no more inline copies.
+from src.utils.config import Config, set_seed, pick_device
 from src.utils.dataset import SteelDefectDataset, collate_func
 from src.utils.transforms_pipeline import get_val_transforms
 
 
-# Setup
-def _pick_device():
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+config = Config(batch_size=2, num_workers=0)
 
-
-device = _pick_device()
-torch.manual_seed(42)
-np.random.seed(42)
-
-
-class Config:
-    DATA_ROOT = Path(project_root) / "data" / "raw"
-    TRAIN_IMG = DATA_ROOT / "train_images"
-    TRAIN_ANN = DATA_ROOT / "train_annotations"
-    NUM_CLASSES = 7
-    BATCH_SIZE = 2
-    NUM_WORKERS = 0
-
-
-config = Config()
-
+device = pick_device()
+set_seed(config.seed)
 
 print("=" * 70)
 print("STEEL DEFECT DETECTION - PIPELINE TEST")
@@ -66,7 +42,7 @@ print("=" * 70)
 print("\n[TEST 1] Dataset Loading")
 print("-" * 70)
 try:
-    dataset = SteelDefectDataset(config.TRAIN_IMG, config.TRAIN_ANN, transforms=get_val_transforms())
+    dataset = SteelDefectDataset(config.train_img, config.train_ann, transforms=get_val_transforms())
     print(f"Dataset created. Total images: {len(dataset)}")
 
     if len(dataset) > 0:
@@ -114,7 +90,7 @@ try:
         dataset,
         batch_size=config.BATCH_SIZE,
         shuffle=False,
-        num_workers=config.NUM_WORKERS,
+        num_workers=config.num_workers,
         collate_fn=collate_func,
     )
     batch_images, batch_targets = next(iter(loader))
@@ -132,7 +108,7 @@ try:
     model.head.classification_head = RetinaNetClassificationHead(
         in_channels=256,
         num_anchors=num_anchors,
-        num_classes=config.NUM_CLASSES,
+        num_classes=config.num_classes,
     )
     model = model.to(device)
     print(f"Model created and moved to {device}. num_anchors={num_anchors} num_classes={config.NUM_CLASSES}")
