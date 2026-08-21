@@ -88,7 +88,7 @@ print("-" * 70)
 try:
     loader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=config.BATCH_SIZE,
+        batch_size=config.batch_size,
         shuffle=False,
         num_workers=config.num_workers,
         collate_fn=collate_func,
@@ -111,7 +111,7 @@ try:
         num_classes=config.num_classes,
     )
     model = model.to(device)
-    print(f"Model created and moved to {device}. num_anchors={num_anchors} num_classes={config.NUM_CLASSES}")
+    print(f"Model created and moved to {device}. num_anchors={num_anchors} num_classes={config.num_classes}")
 except Exception as e:
     print(f"Model creation failed: {e}")
     sys.exit(1)
