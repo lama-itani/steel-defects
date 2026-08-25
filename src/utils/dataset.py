@@ -1,6 +1,7 @@
 import torch
 from pathlib import Path
 import cv2
+import numpy as np
 from src.utils.parse_xml import parse_xml
 
 # Shared class map — kept here for backward compat; the canonical source is
@@ -42,7 +43,7 @@ class SteelDefectDataset(torch.utils.data.Dataset):
             area = torch.zeros((0,), dtype=torch.float32)
             iscrowd = torch.zeros((0,), dtype=torch.int64)
         else:
-            boxes_tensor = torch.as_tensor(boxes, dtype=torch.float32)
+            boxes_tensor = torch.as_tensor(np.array(boxes, dtype=np.float32), dtype=torch.float32)
             labels_tensor = torch.as_tensor(labels, dtype=torch.int64)
             area = (boxes_tensor[:, 2] - boxes_tensor[:, 0]) * (boxes_tensor[:, 3] - boxes_tensor[:, 1])
             iscrowd = torch.zeros((len(boxes),), dtype=torch.int64)
