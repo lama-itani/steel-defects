@@ -10,6 +10,7 @@ It tests sequentially:
 7. Checkpoint saving: Save/load functionality
 Exits on the first failure.
 """
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -19,18 +20,94 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import cv2
+import numpy as np
 import torch
 from torchvision.models.detection import retinanet_resnet50_fpn_v2
 from torchvision.models.detection.retinanet import RetinaNetClassificationHead
 
 from src.utils.config import Config, set_seed, pick_device
 from src.utils.dataset import SteelDefectDataset, collate_func
-from src.utils.transforms_pipeline import get_val_transforms
-
+from src.utils.transforms_pipeline import get_val_transforms, get_train_transforms
+from src.utils.trainEval_pipeline import train_one_epoch, evaluate
 
 config = Config(batch_size=2, num_workers=0)
 
-device = pick_device()
+# --- Fixture -----------------------------------------------------------------
+# Default: a 3-image synthetic fixture generated into a temp dir, so this runs
+# offline, on CPU, with no dataset on disk and no pretrained-weight download.
+# Pass --real to run the identical checks against the on-disk NEU dataset.
+USE_SYNTHETIC = "--real" not in sys.argv
+
+FIXTURE_SIZE = 200          # NEU images are 200x200
+_fixture_tmp = None         # module-level: temp dir must outlive every test
+
+
+def _write_voc_xml(path, filename, boxes, size=FIXTURE_SIZE):
+    """Hand-write a minimal Pascal VOC annotation. `boxes` may be empty."""
+    objects = "".join(
+        f"  <object>\n"
+        f"    <name>{label}</name>\n"
+        f"    <bndbox>\n"
+        f"      <xmin>{xmin}</xmin>\n"
+        f"      <ymin>{ymin}</ymin>\n"
+        f"      <xmax>{xmax}</xmax>\n"
+        f"      <ymax>{ymax}</ymax>\n"
+        f"    </bndbox>\n"
+        f"  </object>\n"
+        for label, xmin, ymin, xmax, ymax in boxes
+    )
+    path.write_text(
+        f"<annotation>\n"
+        f"  <filename>{filename}</filename>\n"
+        f"  <size><width>{size}</width><height>{size}</height><depth>3</depth></size>\n"
+        f"{objects}</annotation>\n"
+    )
+
+
+def build_synthetic_fixture():
+    """
+    Write 3 textured 200x200 JPEGs + matching VOC XML into a temp dir:
+    000_defect_free : zero <object> tags (exercises the empty-target branch)
+    001_crazing     : one box
+    002_scratches   : two boxes, two classes (exercises multi-object collate)
+    Sorted glob order puts the defect-free sample at index 0 on purpose.
+    Returns (img_dir, ann_dir).
+    """
+    global _fixture_tmp
+    _fixture_tmp = tempfile.TemporaryDirectory(prefix="steel_fixture_")
+    root = Path(_fixture_tmp.name)
+    img_dir, ann_dir = root / "images", root / "annotations"
+    img_dir.mkdir()
+    ann_dir.mkdir()
+
+    rng = np.random.default_rng(config.seed)
+    samples = [
+        ("000_defect_free", []),
+        ("001_crazing", [("crazing", 20, 30, 120, 140)]),
+        ("002_scratches", [("scratches", 10, 10, 90, 60),
+                            ("inclusion", 100, 110, 180, 190)]),
+    ]
+    for stem, boxes in samples:
+        # Textured grey, not flat: keeps the normalization check meaningful and
+        # gives the augmentation pipeline something real to act on.
+        img = rng.integers(90, 165, size=(FIXTURE_SIZE, FIXTURE_SIZE, 3), dtype=np.uint8)
+        for _, xmin, ymin, xmax, ymax in boxes:
+            patch = img[ymin:ymax, xmin:xmax].astype(np.int16) + 60
+            img[ymin:ymax, xmin:xmax] = np.clip(patch, 0, 255).astype(np.uint8)
+        cv2.imwrite(str(img_dir / f"{stem}.jpg"), img)
+        _write_voc_xml(ann_dir / f"{stem}.xml", f"{stem}.jpg", boxes)
+
+    return img_dir, ann_dir
+
+
+if USE_SYNTHETIC:
+    device = torch.device("cpu")        # forced: determinism, no GPU needed
+    img_dir, ann_dir = build_synthetic_fixture()
+else:
+    device = pick_device()
+    img_dir, ann_dir = config.train_img, config.train_ann
+
 set_seed(config.seed)
 
 print("=" * 70)
@@ -41,7 +118,7 @@ print("=" * 70)
 print("\n[TEST 1] Dataset Loading")
 print("-" * 70)
 try:
-    dataset = SteelDefectDataset(config.train_img, config.train_ann, transforms=get_val_transforms())
+    dataset = SteelDefectDataset(img_dir, ann_dir, transforms=get_val_transforms())
     print(f"Dataset created. Total images: {len(dataset)}")
 
     if len(dataset) > 0:
@@ -54,6 +131,19 @@ try:
             print("Labels in valid range [1-6]")
         else:
             print("Sample has zero boxes (defect-free image) — pipeline handled it cleanly.")
+
+        # Cover every sample, not just index 0. Capped on the real dataset.
+        n_check = len(dataset) if USE_SYNTHETIC else min(len(dataset), 5)
+        for i in range(n_check):
+            img_i, tgt_i = dataset[i]
+            assert img_i.ndim == 3 and img_i.shape[0] == 3, \
+                f"Sample {i}: expected CHW with 3 channels, got {tuple(img_i.shape)}"
+            lengths = {tgt_i[k].shape[0] for k in ("boxes", "labels", "area", "iscrowd")}
+            assert len(lengths) == 1, f"Sample {i}: target field lengths disagree ({lengths})"
+            if tgt_i["labels"].numel():
+                assert tgt_i["labels"].min().item() >= 1 and tgt_i["labels"].max().item() <= 6, \
+                    f"Sample {i}: label out of range [1-6]"
+        print(f"Checked {n_check} sample(s): consistent target fields, labels in range")
     else:
         print("No images found in dataset!")
         sys.exit(1)
@@ -61,11 +151,11 @@ except Exception as e:
     print(f"Dataset loading failed: {e}")
     sys.exit(1)
 
-# Test 1.5: Verify normalization
+# Test 1.1: Verify normalization
 print("\n[TEST 1.5] Verify Normalization")
 print("-" * 70)
 try:
-    image, target = dataset[1]
+    image, target = dataset[0]
     img_min, img_max = image.min().item(), image.max().item()
     img_mean = image.mean().item()
 
@@ -79,6 +169,40 @@ try:
     print("Normalization present (not raw [0,1])")
 except Exception as e:
     print(f"Normalization check failed: {e}")
+    sys.exit(1)
+
+# Test 1.2: Train-transform path (augementation + zero-box branch)
+print("\n[TEST 1.2] Train Transform (Augmentation + Zero-Box)")
+print("-" * 70)
+try:
+    train_tf_dataset = SteelDefectDataset(img_dir, ann_dir, transforms=get_train_transforms())
+
+    img0, tgt0 = train_tf_dataset[0]
+    assert img0.ndim == 3 and img0.shape[0] == 3, f"Bad CHW shape: {tuple(img0.shape)}"
+    if USE_SYNTHETIC:
+        assert tgt0["boxes"].shape == (0, 4), \
+            f"Fixture sample 0 must be defect-free, got boxes {tuple(tgt0['boxes'].shape)}"
+        assert tgt0["labels"].shape == (0,) and tgt0["area"].shape == (0,) \
+            and tgt0["iscrowd"].shape == (0,), "Zero-box target has wrong field shapes"
+        assert tgt0["boxes"].dtype == torch.float32 and tgt0["labels"].dtype == torch.int64
+        print("Zero-box branch OK under get_train_transforms()")
+
+    idx_boxed, tgt_boxed = None, None
+    for i in range(len(train_tf_dataset)):
+        _, t = train_tf_dataset[i]
+        if t["labels"].numel() > 0:
+            idx_boxed, tgt_boxed = i, t
+            break
+    assert tgt_boxed is not None, "No annotated sample survived augmentation — path untested"
+
+    b = tgt_boxed["boxes"]
+    assert b.shape[1] == 4 and b.shape[0] == tgt_boxed["labels"].shape[0], \
+        "Augmented boxes/labels disagree in length"
+    assert torch.all(b[:, 2] > b[:, 0]) and torch.all(b[:, 3] > b[:, 1]), \
+        "Augmentation produced a degenerate box (xmax<=xmin or ymax<=ymin)"
+    print(f"Augmented sample {idx_boxed}: {b.shape[0]} box(es), all non-degenerate")
+except Exception as e:
+    print(f"Train-transform check failed: {e}")
     sys.exit(1)
 
 # TEST 2: DataLoader
@@ -102,13 +226,18 @@ except Exception as e:
 print("\n[TEST 3] Model Creation")
 print("-" * 70)
 try:
-    model = retinanet_resnet50_fpn_v2(weights="DEFAULT")
+    # weights=None on the synthetic path: no network, no torch-hub cache needed.
+    model = retinanet_resnet50_fpn_v2(weights="DEFAULT" if not USE_SYNTHETIC else None)
     num_anchors = model.head.classification_head.num_anchors
     model.head.classification_head = RetinaNetClassificationHead(
         in_channels=256,
         num_anchors=num_anchors,
         num_classes=config.num_classes,
     )
+    if USE_SYNTHETIC:
+        # Skip the 800px upscale so the CPU run is seconds, not minutes.
+        model.transform.min_size = (FIXTURE_SIZE,)
+        model.transform.max_size = FIXTURE_SIZE
     model = model.to(device)
     print(f"Model created and moved to {device}. num_anchors={num_anchors} num_classes={config.num_classes}")
 except Exception as e:
@@ -188,6 +317,42 @@ try:
         print(f"Checkpoint saved & reloaded from {ckpt}")
 except Exception as e:
     print(f"Checkpoint saving/loading failed: {e}")
+    sys.exit(1)
+
+# TEST 8: The repo's own training/eval code (trainEval_pipeline)
+print("\n[TEST 8] trainEval_pipeline Smoke Cycle")
+print("-" * 70)
+try:
+    smoke_optimizer = torch.optim.SGD(model.parameters(), lr=1e-4, momentum=0.9)
+
+    train_loss = train_one_epoch(model, loader, smoke_optimizer, device)
+    assert isinstance(train_loss, float) and math.isfinite(train_loss), \
+        f"train_one_epoch returned {train_loss!r} (expected a finite float)"
+    assert model.training, "train_one_epoch should leave the model in train mode"
+    print(f"train_one_epoch OK. Mean loss: {train_loss:.4f}")
+
+    results = evaluate(model, loader, device)
+
+    # The P0 BatchNorm fix: evaluate() must never flip back to .train().
+    assert not model.training, \
+        "evaluate() left the model in train mode — BatchNorm running stats get corrupted"
+
+    # These exact keys are indexed by the notebook and jobs/model_training_job.py.
+    required = {"map_50", "map", "val_loss", "precision", "recall", "map_per_class"}
+    missing = required - set(results)
+    assert not missing, f"evaluate() lost keys downstream code indexes: {sorted(missing)}"
+
+    # notebook does results["map_50"].item() unconditionally -> must stay a tensor
+    assert torch.is_tensor(results["map_50"]), \
+        f"map_50 must be a tensor, got {type(results['map_50']).__name__}"
+    # notebook's _val_loss_is_meaningful() checks isinstance(v, float) and isnan(v)
+    assert isinstance(results["val_loss"], float) and math.isnan(results["val_loss"]), \
+        f"val_loss should be float('nan'), got {results['val_loss']!r}"
+
+    print(f"evaluate OK. keys: {sorted(results)}")
+    print(f"mAP@50: {results['map_50'].item():.4f} (meaningless on a random model — shape check only)")
+except Exception as e:
+    print(f"trainEval_pipeline smoke cycle failed: {e}")
     sys.exit(1)
 
 print("\n" + "=" * 70)

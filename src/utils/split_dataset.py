@@ -43,10 +43,10 @@ def resplit_dataset(data_root, train_ratio=0.80, seed=42):
     Resplit dataset into train_ratio / (1 - train_ratio) with stratification.
 
     Args:
-        data_root:   Path to data/raw directory (must contain train_images,
-                     train_annotations, valid_images, valid_annotations).
+        data_root: Path to data/raw directory (must contain train_images,
+        train_annotations, valid_images, valid_annotations).
         train_ratio: Training set ratio (default 0.80).
-        seed:        Random seed for reproducibility.
+        seed: Random seed for reproducibility.
     """
     random.seed(seed)
     data_root = Path(data_root)
