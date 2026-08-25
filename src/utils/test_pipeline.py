@@ -19,7 +19,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import numpy as np
 import torch
 from torchvision.models.detection import retinanet_resnet50_fpn_v2
 from torchvision.models.detection.retinanet import RetinaNetClassificationHead
@@ -72,12 +71,12 @@ try:
 
     print(f"Image range: [{img_min:.3f}, {img_max:.3f}]  mean: {img_mean:.3f}")
 
-    if -3 < img_min < -0.5 and 0.5 < img_max < 3:
-        print("ImageNet normalization detected")
-    elif 0 <= img_min < 0.1 and 0.9 < img_max <= 1.0:
-        print("WARNING: No normalization applied (values in [0,1])")
-    else:
-        print("Unexpected range, check normalization")
+    unnormalized = (0 <= img_min < 0.1) and (0.9 < img_max <= 1.0)
+    assert not unnormalized, (
+        f"No normalization applied — raw [0,1] range detected "
+        f"[{img_min:.3f}, {img_max:.3f}]"
+    )
+    print("Normalization present (not raw [0,1])")
 except Exception as e:
     print(f"Normalization check failed: {e}")
     sys.exit(1)
@@ -124,6 +123,8 @@ try:
     with torch.no_grad():
         test_images = [img.to(device) for img in batch_images[:2]]
         predictions = model(test_images)
+        assert set(predictions[0].keys()) == {"boxes", "labels", "scores"}, \
+            f"Unexpected prediction keys: {sorted(predictions[0].keys())}"
         print(f"Predictions: {len(predictions)}  keys: {list(predictions[0].keys())}")
         print(f"Pred boxes: {predictions[0]['boxes'].shape}  scores: {predictions[0]['scores'].shape}")
 except Exception as e:
@@ -157,10 +158,17 @@ try:
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     optimizer.zero_grad()
 
+    tracked = [p for p in model.head.classification_head.parameters() if p.requires_grad]
+    assert tracked, "No trainable parameters in the classification head"
+    before = [p.detach().clone() for p in tracked]
+
     loss_dict = model(test_images, test_targets)
     total_loss = sum(loss for loss in loss_dict.values())
     total_loss.backward()
     optimizer.step()
+
+    assert any(not torch.equal(b, p) for b, p in zip(before, tracked)), \
+        "optimizer.step() did not change any classification-head parameter"
     print(f"Optimizer step OK. Loss before step: {total_loss.item():.4f}")
 except Exception as e:
     print(f"Optimizer step failed: {e}")
@@ -172,8 +180,11 @@ print("-" * 70)
 try:
     with tempfile.TemporaryDirectory() as tmp:
         ckpt = Path(tmp) / "test_checkpoint.pth"
+        saved = {k: v.detach().clone() for k, v in model.state_dict().items()}
         torch.save(model.state_dict(), ckpt)
-        model.load_state_dict(torch.load(ckpt))
+        model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=True))
+        for k, v in model.state_dict().items():
+            assert torch.equal(v, saved[k]), f"Checkpoint mismatch on parameter {k}"
         print(f"Checkpoint saved & reloaded from {ckpt}")
 except Exception as e:
     print(f"Checkpoint saving/loading failed: {e}")
