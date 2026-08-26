@@ -1,6 +1,6 @@
 """
 Central configuration for the steel-defect detection project.
- 
+
 Import from here in both the notebook driver and the headless training job so
 paths, class map, and hyperparameters live in one place.
 """

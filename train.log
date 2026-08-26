@@ -1,0 +1,3 @@
+nohup: ignoring input
+/home/cdsw/.visual-qc/lib/python3.12/site-packages/albumentations/core/composition.py:359: UserWarning: Got processor for bboxes, but no transform to process it.
+  self._set_keys()

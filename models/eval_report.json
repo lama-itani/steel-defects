@@ -1,0 +1,17 @@
+{
+  "checkpoint": "models/retinanet_epoch_24.pth",
+  "checkpoint_epoch": null,
+  "checkpoint_best_map": null,
+  "num_val_images": 360,
+  "eval_seconds": 276.6,
+  "map_50": 0.6585995554924011,
+  "map": 0.33026427030563354,
+  "per_class_ap": {
+    "crazing": 0.11892948299646378,
+    "inclusion": 0.3519112765789032,
+    "patches": 0.4989791512489319,
+    "pitted_surface": 0.3776935040950775,
+    "rolled-in_scale": 0.19076071679592133,
+    "scratches": 0.44331151247024536
+  }
+}
