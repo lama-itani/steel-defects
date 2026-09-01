@@ -5,10 +5,13 @@ Returns a list of dicts, one per <object>, with keys:
     label, xmin, ymin, xmax, ymax
 
 Skips objects that are missing required fields or that have degenerate boxes
-(xmin >= xmax or ymin >= ymax) and prints a warning rather than crashing the
+(xmin >= xmax or ymin >= ymax) and logs a warning rather than crashing the
 data loading pipeline.
 """
+import logging
 import xml.etree.ElementTree as ET
+
+logger = logging.getLogger(__name__)
 
 
 class AnnotationParseError(ValueError):
@@ -40,7 +43,7 @@ def parse_xml(xml_path):
         name_el = obj.find('name')
         bndbox = obj.find('bndbox')
         if name_el is None or name_el.text is None or bndbox is None:
-            print(f"[parse_xml] skipping object with missing name/bndbox in {xml_path}")
+            logger.warning(f"skipping object with missing name/bndbox in {xml_path}")
             continue
 
         xmin = _int_or_none(bndbox.find('xmin'))
@@ -49,11 +52,11 @@ def parse_xml(xml_path):
         ymax = _int_or_none(bndbox.find('ymax'))
 
         if None in (xmin, ymin, xmax, ymax):
-            print(f"[parse_xml] skipping object with missing coord in {xml_path}")
+            logger.warning(f"skipping object with missing coord in {xml_path}")
             continue
         if xmin >= xmax or ymin >= ymax:
-            print(
-                f"[parse_xml] skipping degenerate box "
+            logger.warning(
+                f"skipping degenerate box "
                 f"({xmin}, {ymin}, {xmax}, {ymax}) in {xml_path}"
             )
             continue
