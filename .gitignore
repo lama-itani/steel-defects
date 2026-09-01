@@ -4,6 +4,12 @@
 .visual-qc/
 venv-CVsteel/
 
+# Code review files
+tracking-code-review.md
+QUICK_WINS.md
+2026-08-11-code-review-and-p0-fixes-summary.md
+correction-plan.md
+
 # ML Models & Weights
 *.pth
 *.pt
