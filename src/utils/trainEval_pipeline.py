@@ -1,8 +1,16 @@
+from typing import Dict
+
 import torch
+from torch.utils.data import DataLoader
 from torchmetrics.detection import MeanAveragePrecision
 
 
-def train_one_epoch(model, loader, optimizer, device):
+def train_one_epoch(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+) -> float:
     model.train()
     total_loss = 0
 
@@ -27,7 +35,11 @@ def train_one_epoch(model, loader, optimizer, device):
 
 
 @torch.no_grad()
-def evaluate(model, loader, device):
+def evaluate(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    device: torch.device,
+) -> Dict[str, float]:
     """
     Validation pass. Stays in .eval() the whole time — do NOT flip to .train()
     to read losses, since that updates BatchNorm running statistics on val data.
