@@ -20,7 +20,7 @@ _BBOX_PARAMS = A.BboxParams(
 )
 
 
-def get_train_transforms():
+def get_train_transforms() -> A.Compose:
     return A.Compose(
         [
             A.HorizontalFlip(p=0.5),
@@ -35,7 +35,7 @@ def get_train_transforms():
     )
 
 
-def get_val_transforms():
+def get_val_transforms() -> A.Compose:
     """Validation: clean images, only format conversion + normalization."""
     return A.Compose(
         [

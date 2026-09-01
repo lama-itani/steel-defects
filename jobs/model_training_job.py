@@ -8,7 +8,7 @@ suitable for a job scheduler (CML, Slurm, cron, GitHub Actions...).
 Usage:
     python jobs/model_training_job.py                      # default config
     python jobs/model_training_job.py --epochs 24 --lr .0005
-    python jobs/model_training_job.py --resume models/retinanet_best.pth
+    python jobs/model_training_job.py --resume notebooks/models/retinanet_best.pth
 """
 from __future__ import annotations
 
@@ -97,10 +97,17 @@ def save_checkpoint(path: Path, model, optimizer, scheduler, cfg: Config, epoch:
     )
 
 
+def to_scalar(v) -> float:
+    """Convert tensor or numeric type to Python float."""
+    if torch.is_tensor(v):
+        return v.item()
+    return float(v)
+
+
 def save_metrics_json(path: Path, history: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     clean = {
-        k: [float(v) if torch.is_tensor(v) else v for v in vals]
+        k: [to_scalar(v) if torch.is_tensor(v) else v for v in vals]
         for k, vals in history.items()
     }
     with open(path, "w") as f:
@@ -141,7 +148,9 @@ def train(cfg: Config, resume: Path | None = None) -> dict:
     best_map = 0.0
     patience_counter = 0
 
-    if resume and resume.exists():
+    if resume is not None:
+        if not resume.exists():
+            raise FileNotFoundError(f"Resume checkpoint not found: {resume}")
         print(f"Resuming from {resume}")
         ckpt = torch.load(resume, map_location=device)
         if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
@@ -165,11 +174,9 @@ def train(cfg: Config, resume: Path | None = None) -> dict:
         results = evaluate(model, val_loader, device)
 
         val_loss = results["val_loss"]
-        val_map50 = results["map_50"].item() if torch.is_tensor(results["map_50"]) else float(results["map_50"])
-        precision = results.get("precision", torch.tensor(0.0))
-        precision = precision.item() if torch.is_tensor(precision) else float(precision)
-        recall = results.get("recall", torch.tensor(0.0))
-        recall = recall.item() if torch.is_tensor(recall) else float(recall)
+        val_map50 = to_scalar(results["map_50"])
+        precision = to_scalar(results.get("precision", torch.tensor(0.0)))
+        recall = to_scalar(results.get("recall", torch.tensor(0.0)))
         per_class_ap = results.get("map_per_class")
         if torch.is_tensor(per_class_ap):
             per_class_ap = per_class_ap.cpu().numpy()

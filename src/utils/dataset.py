@@ -1,7 +1,9 @@
-import torch
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import cv2
 import numpy as np
+import torch
 from src.utils.parse_xml import parse_xml
 
 # Shared class map — kept here for backward compat; the canonical source is
@@ -22,17 +24,27 @@ class SteelDefectDataset(torch.utils.data.Dataset):
     Compatible with torchvision detection models (RetinaNet, Faster R-CNN, ...).
     """
 
-    def __init__(self, img_dir, ann_dir, transforms=None):
+    def __init__(
+        self,
+        img_dir: Union[str, Path],
+        ann_dir: Union[str, Path],
+        transforms: Optional[Callable] = None,
+    ) -> None:
         self.img_dir = Path(img_dir)
         self.ann_dir = Path(ann_dir)
         self.transforms = transforms
         self.images = sorted(list(self.img_dir.glob("*.jpg")))
         self.class_map = CLASS_MAP
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.images)
 
-    def _build_target(self, boxes, labels, idx):
+    def _build_target(
+        self,
+        boxes: List[List[float]],
+        labels: List[int],
+        idx: int,
+    ) -> Dict[str, torch.Tensor]:
         """
         Assemble the torchvision-detection target dict from raw box/label lists.
         Handles the zero-box case (defect-free images) cleanly.
@@ -56,7 +68,7 @@ class SteelDefectDataset(torch.utils.data.Dataset):
             "iscrowd": iscrowd,
         }
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[Union[np.ndarray, torch.Tensor], Dict[str, torch.Tensor]]:
         img_path = self.images[idx]
         image = cv2.imread(str(img_path))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # OpenCV BGR -> RGB (torch/RetinaNet)
@@ -87,7 +99,7 @@ class SteelDefectDataset(torch.utils.data.Dataset):
         return image, target
 
 
-def collate_func(batch):
+def collate_func(batch: List[Tuple[Any, Dict[str, torch.Tensor]]]) -> Tuple[Tuple, Tuple]:
     """
     Transpose a batch of (image, target) pairs into (images, targets) tuples.
     Necessary because detection targets have variable-length bbox tensors.
