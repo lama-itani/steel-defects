@@ -1,0 +1,44 @@
+OMP: Warning #179: Function Can't set size of /tmp file failed:
+/Users/litani/.matplotlib is not a writable directory
+Matplotlib created a temporary cache directory at /tmp/claude-501/matplotlib-2b839tiw because there was an issue with the default path (/Users/litani/.matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+
+Fontconfig error: No writable cache directories
+	/opt/homebrew/var/cache/fontconfig
+	/Users/litani/.cache/fontconfig
+	/Users/litani/.fontconfig
+
+Fontconfig error: No writable cache directories
+	/opt/homebrew/var/cache/fontconfig
+	/Users/litani/.cache/fontconfig
+	/Users/litani/.fontconfig
+
+Fontconfig error: No writable cache directories
+	/opt/homebrew/var/cache/fontconfig
+	/Users/litani/.cache/fontconfig
+	/Users/litani/.fontconfig
+
+Fontconfig error: No writable cache directories
+	/opt/homebrew/var/cache/fontconfig
+	/Users/litani/.cache/fontconfig
+	/Users/litani/.fontconfig
+
+Fontconfig error: No writable cache directories
+	/opt/homebrew/var/cache/fontconfig
+	/Users/litani/.cache/fontconfig
+	/Users/litani/.fontconfig
+Matplotlib is building the font cache; this may take a moment.
+======================================================================
+Steel Defect Detection — headless training job
+Device: cpu | workers: 0
+Epochs: 1 | batch: 24 | lr: 0.001
+Data root: /Users/litani/claude-workspace/notebooks/steel-defects/data/raw
+======================================================================
+/Users/litani/Documents/myCode/steel-defects/venv-CVsteel/lib/python3.14/site-packages/albumentations/core/composition.py:359: UserWarning: Got processor for bboxes, but no transform to process it.
+  self._set_keys()
+
+======================================================================
+Epoch 1/1
+======================================================================
+  Batch [10/60] Loss: 1.5701
+  Batch [20/60] Loss: 1.5974
+  Batch [30/60] Loss: 1.5589

@@ -71,6 +71,8 @@ class SteelDefectDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx: int) -> Tuple[Union[np.ndarray, torch.Tensor], Dict[str, torch.Tensor]]:
         img_path = self.images[idx]
         image = cv2.imread(str(img_path))
+        if image is None:
+            raise FileNotFoundError(f"Failed to read image: {img_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # OpenCV BGR -> RGB (torch/RetinaNet)
 
         xml_path = self.ann_dir / img_path.name.replace(".jpg", ".xml")
@@ -99,7 +101,7 @@ class SteelDefectDataset(torch.utils.data.Dataset):
         return image, target
 
 
-def collate_func(batch: List[Tuple[Any, Dict[str, torch.Tensor]]]) -> Tuple[Tuple, Tuple]:
+def collate_func(batch: List[Tuple[Any, Dict[str, torch.Tensor]]]) -> Tuple[Tuple[Any, ...], ...]:
     """
     Transpose a batch of (image, target) pairs into (images, targets) tuples.
     Necessary because detection targets have variable-length bbox tensors.
